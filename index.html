@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<script type="module" src="/ble-native.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C3 TFT – điều khiển qua Bluetooth</title>
+<style>
+  :root{--ink:#2d2650;--mute:#7f77a6;--line:#ece4fb;--pink:#ff9ec7;--peach:#ffc89b;--lemon:#ffe58f;--mint:#9be7c4;--sky:#8fd3ff;--lav:#b9a6ff;--acc:#8e6bff;--ok:#2fcf9b;--bad:#ff6b92}
+  #codeBox:not([hidden]){display:grid;place-items:center}
+  *{box-sizing:border-box}
+  html{color-scheme:light}
+  body{margin:0;min-height:100vh;color:var(--ink);background:#fdf8ff;font:16px/1.5 ui-rounded,"Nunito","Segoe UI",system-ui,sans-serif}
+  .bg{position:fixed;inset:0;z-index:-1;background:radial-gradient(40vmax 40vmax at 8% 0,#ffd6ea99,transparent 60%),radial-gradient(45vmax 45vmax at 100% 8%,#cfe8ffaa,transparent 60%),radial-gradient(40vmax 40vmax at 0 100%,#d9ffe8bb,transparent 60%),radial-gradient(35vmax 35vmax at 100% 100%,#e6d9ffaa,transparent 60%),#fdf8ff}
+  main{max-width:600px;margin:0 auto;padding:16px 14px 150px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo i{font-style:normal;width:46px;height:46px;display:grid;place-items:center;font-size:1.5rem;border-radius:16px;background:linear-gradient(135deg,var(--pink),var(--lav));box-shadow:0 6px 16px #b79cff66}
+  h1{margin:0;font-size:1.35rem;font-weight:800;line-height:1.1;background:linear-gradient(90deg,#ff7fb5,#8e6bff 60%,#4fb6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1 small{display:block;font-size:.72rem;font-weight:600;color:var(--mute);-webkit-text-fill-color:var(--mute)}
+  h2{margin:0 0 6px;font-size:1.08rem;font-weight:800}
+  h3{margin:14px 0 0;font-size:.9rem;color:var(--mute)}
+  .card h2::before{content:"";display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:8px;background:var(--c,var(--lav))}
+  p.hint,.hint{margin:0 0 12px;color:var(--mute);font-size:.88rem}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .grow{flex:1 1 170px}
+  button,select,input{font:inherit;color:var(--ink)}
+  button{border:0;border-radius:16px;padding:9px 16px;background:#fff;font-weight:700;cursor:pointer;box-shadow:0 2px 0 var(--line),0 6px 14px #8e6bff14;transition:transform .15s,box-shadow .15s}
+  button:hover:not(:disabled){transform:translateY(-2px)}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:linear-gradient(135deg,#ff8fc2,#9a7bff);color:#fff;box-shadow:0 8px 20px #9a7bff55}
+  :focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+  input[type=text],input[type=time],input[type=date],select{width:100%;border:2px solid var(--line);border-radius:14px;padding:9px 12px;background:#fff}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  input[type=color]{width:46px;height:40px;padding:2px;border:2px solid var(--line);border-radius:12px;background:#fff;cursor:pointer}
+  label{display:block;margin:0 0 5px;font-size:.85rem;font-weight:700;color:var(--mute)}
+  label.chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:600;margin:0}
+  .vh{position:absolute;opacity:0;width:1px;height:1px}
+  label.drop{text-align:center;padding:18px;border:2.5px dashed #c9bdf5;border-radius:20px;background:#faf6ff;color:var(--acc);font-size:1rem;cursor:pointer}
+  .status{display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:#fff;font-size:.82rem;font-weight:700;color:var(--mute);box-shadow:0 4px 12px #8e6bff1f}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--bad)}
+  .status.on .dot{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .hero{display:flex;gap:18px;align-items:center;padding:18px;border-radius:28px;background:linear-gradient(135deg,#ffe3f1,#e4dcff 55%,#d7f1ff);box-shadow:0 14px 34px #9a7bff33}
+  .device{position:relative;flex:0 0 118px;height:118px;padding:7px;border-radius:24px;background:#fff;box-shadow:0 8px 20px #8e6bff40}
+  .scr{position:relative;z-index:1;height:100%;border-radius:17px;background:#16122f;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden}
+  #heroDate{font-size:.62rem;font-weight:700;color:#ffd65a}
+  #heroTime{font-size:1.7rem;font-weight:800;line-height:1;color:#64d2ff;letter-spacing:1px}
+  #heroSec{position:absolute;left:0;top:0;height:3px;width:0;background:#6ee6aa}
+  .badge{display:inline-block;padding:3px 12px;border-radius:999px;background:#fff;font-size:.8rem;font-weight:800;color:var(--acc)}
+  .sec{display:flex;align-items:baseline;justify-content:space-between;margin:22px 4px 10px}
+  .sec small{color:var(--mute);font-weight:600;font-size:.78rem}
+  .modes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  button.mode{display:flex;flex-direction:column;align-items:center;gap:4px;padding:13px 2px;font-size:.78rem;color:#3a2f5e;border-radius:20px;background:linear-gradient(145deg,var(--a),var(--b))}
+  button.mode .ico{font-size:1.65rem;line-height:1}
+  button.mode[aria-pressed=true]{transform:translateY(-3px) scale(1.04);box-shadow:0 0 0 3px #fff,0 0 0 6px var(--acc),0 12px 24px #8e6bff55}
+  .card{margin-top:14px;padding:18px;border-radius:26px;background:#ffffffd0;backdrop-filter:blur(14px);border:1.5px solid #fff;box-shadow:0 12px 34px #8e6bff1f}
+  [hidden]{display:none!important}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips button{padding:7px 15px;background:#f4eeff;box-shadow:none}
+  .chips button[aria-pressed=true]{background:linear-gradient(135deg,#ffb3d6,#b9a6ff);color:#fff}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:14px 0}
+  .screen{display:block;width:100%;max-width:340px;aspect-ratio:1/1;margin:14px auto 0;background:#000;border:6px solid #fff;border-radius:22px;box-shadow:0 10px 26px #8e6bff40;image-rendering:pixelated}
+  .pad{cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
+  .tools{display:flex;gap:8px;margin:14px 0 10px}.tools button{flex:1;background:#f4eeff;box-shadow:none}
+  button.tool[aria-pressed=true]{background:linear-gradient(135deg,#9be7c4,#8fd3ff)}
+  .palette{display:grid;grid-template-columns:repeat(8,1fr);gap:7px;margin:8px 0 12px}
+  .sw{aspect-ratio:1/1;padding:0;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line)}
+  .sw[aria-pressed=true]{box-shadow:0 0 0 3px var(--acc);transform:scale(1.14)}
+  progress{width:100%;height:8px;margin-top:10px;accent-color:var(--acc)}
+  #wx{margin-top:10px;font-weight:700;color:#3f8fd0}
+  .bars{display:flex;gap:6px;align-items:flex-end;height:120px;margin-top:8px}
+  .bc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px}
+  .bc small{color:var(--mute);font-size:.7rem;font-weight:700}
+  .bar{width:100%;border-radius:10px 10px 0 0;background:linear-gradient(var(--pink),var(--sky))}
+  .evl{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+  .evl li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-radius:14px;background:#f4eeff;font-size:.9rem;font-weight:600}
+  .evl button{padding:2px 10px}
+  .nav{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;display:flex;gap:4px;width:min(92vw,420px);padding:6px;border-radius:30px;background:#ffffffe8;backdrop-filter:blur(14px);box-shadow:0 12px 34px #8e6bff45}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;border-radius:24px;background:transparent;box-shadow:none;font-size:.75rem;color:var(--mute)}
+  .tab span{font-size:1.35rem;line-height:1}
+  .tab[aria-selected=true]{color:var(--ink);background:linear-gradient(135deg,#ffd6ea,#d9ccff)}
+  #log{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:6;max-width:92vw;padding:7px 16px;border-radius:999px;background:#2d2650;color:#fff;font-size:.8rem;text-align:center;box-shadow:0 8px 20px #2d265055}
+  #log.err{background:var(--bad)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<main>
+  <header>
+    <div class="logo"><i>🔑</i><h1>C3 TFT<small>Móc khóa màn hình mini</small></h1></div>
+    <div class="row">
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Chưa kết nối</span></div>
+      <button class="primary" id="btnConnect">Kết nối Bluetooth</button>
+    </div>
+  </header>
+
+  <section class="panel" id="p-screen">
+    <div class="hero">
+      <div class="device"><div class="scr"><div id="heroSec"></div><div id="heroDate">--</div><div id="heroTime">--:--</div></div></div>
+      <div><h2 style="margin:0">Xin chào 👋</h2><p class="hint" style="margin:4px 0 10px">Chạm một chế độ bên dưới để hiện lên móc khóa.</p><span class="badge" id="heroMode">Chưa chọn chế độ</span></div>
+    </div>
+    <h2 class="sec">Chế độ hiển thị <small>chạm để bật và chỉnh</small></h2>
+    <div class="modes" id="modes"></div>
+
+    <div class="card sub" id="sub-note" style="--c:var(--lav)"><p class="hint" id="noteText" style="margin:0"></p></div>
+
+    <div class="card sub" id="sub-clock" style="--c:var(--lemon)" hidden>
+      <h2>Đồng hồ</h2>
+      <label for="clockStyle">Kiểu đồng hồ</label>
+      <select id="clockStyle"><option value="0">Số lớn</option><option value="1">Kim</option><option value="2">Xếp dọc</option><option value="3">Tối giản</option></select>
+      <div class="row" style="margin-top:14px"><button data-needs-conn id="btnTime">Đồng bộ giờ ngay</button><span id="localTime" class="hint" style="margin:0"></span></div>
+      <p class="hint" style="margin:10px 0 0">Tự đồng bộ khi kết nối. Giờ chạy trên ESP32 nên không cần giữ kết nối liên tục.</p>
+    </div>
+
+    <div class="card sub" id="sub-wx" style="--c:var(--sky)" hidden>
+      <h2>Thời tiết và dự báo</h2>
+      <p class="hint">Lấy từ Open-Meteo (không cần API key) rồi gửi sang ESP32.</p>
+      <div class="row">
+        <div class="grow"><label for="city">Thành phố</label><input type="text" id="city" value="Ho Chi Minh City"></div>
+        <button data-needs-conn class="primary" id="btnWeather" style="align-self:flex-end">Cập nhật và gửi</button>
+      </div>
+      <label class="chk" style="margin-top:12px"><input type="checkbox" id="autoWeather" checked> Tự cập nhật mỗi 15 phút khi đang kết nối</label>
+      <div id="wx"></div>
+      <div id="wxChart"></div>
+      <div id="wxChart2"></div>
+    </div>
+
+    <div class="card sub" id="sub-img" style="--c:var(--pink)" hidden>
+      <h2>Hình ảnh và GIF</h2>
+      <p class="hint">Một ảnh tĩnh dùng 65.536 màu. Nhiều ảnh hoặc GIF dùng bảng 256 màu để chứa được nhiều khung hơn (tối đa tùy RAM còn trống của ESP32).</p>
+      <label class="drop" for="file">📁 Chọn ảnh hoặc GIF</label>
+      <input type="file" id="file" class="vh" accept="image/*" multiple>
+      <div class="controls">
+        <div><label for="fit">Cách vừa khung</label>
+          <select id="fit"><option value="contain">Giữ tỉ lệ (có viền đen)</option><option value="cover">Phủ kín (cắt bớt)</option><option value="stretch">Kéo giãn</option></select></div>
+        <div><label for="fps">Tốc độ: <span id="fpsV">4</span> khung/giây</label><input type="range" id="fps" min="1" max="12" value="4"></div>
+        <div style="align-self:end"><label class="chk"><input type="checkbox" id="dither" checked> Dither (mượt vùng chuyển sắc)</label></div>
+      </div>
+      <canvas id="preview" class="screen" width="128" height="128" aria-label="Xem trước màn hình TFT"></canvas>
+      <div class="row" style="margin-top:14px"><button data-needs-conn class="primary" id="btnImage" disabled>Gửi lên màn hình</button><span id="frameInfo" class="hint" style="margin:0">Chưa chọn ảnh</span></div>
+      <progress id="prog" value="0" max="1" hidden></progress>
+    </div>
+
+    <div class="card sub" id="sub-draw" style="--c:var(--mint)" hidden>
+      <h2>Bảng vẽ đơn sắc</h2>
+      <p class="hint">Cả bản vẽ dùng một màu cọ trên một màu nền. Đổi màu sẽ đổi toàn bộ nét vẽ.</p>
+      <canvas id="pad" class="screen pad" width="128" height="128" aria-label="Bảng vẽ"></canvas>
+      <div class="tools"><button class="tool" id="toolPen" aria-pressed="true">✏️ Bút</button><button class="tool" id="toolEraser" aria-pressed="false">🧽 Tẩy</button></div>
+      <label>Bảng màu cọ</label>
+      <div class="palette" id="palette"></div>
+      <div class="row">
+        <label for="colFg" style="margin:0">Màu cọ</label><input type="color" id="colFg" value="#ff9ecb">
+        <label for="colBg" style="margin:0 0 0 8px">Màu nền</label><input type="color" id="colBg" value="#000000">
+      </div>
+      <div style="margin-top:12px"><label for="padSize">Cỡ nét: <span id="padSizeV">1</span></label><input type="range" id="padSize" min="1" max="3" value="1"></div>
+      <div class="row" style="margin-top:12px"><button id="padClear">Xóa hết</button><button id="padFromImage">Lấy ảnh tab Ảnh làm nền (đen trắng)</button></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-ev" hidden>
+    <div class="card" style="--c:var(--lav)">
+      <h2>Sự kiện nhắc nhở</h2>
+      <p class="hint">Đến đúng giờ, màn hình hiện thông báo toàn màn hình trong 60 giây. Ghi chú viết không dấu, tối đa 22 ký tự.</p>
+      <div class="controls">
+        <div><label for="evDate">Ngày</label><input type="date" id="evDate"></div>
+        <div><label for="evTime">Giờ : phút : giây</label><input type="time" id="evTime" step="1" value="08:00:00"></div>
+      </div>
+      <label for="evNote">Ghi chú</label><input type="text" id="evNote" maxlength="22" placeholder="Hop 9h, Sinh nhat...">
+      <div class="row" style="margin-top:14px"><button class="primary" id="evAdd">Thêm sự kiện</button><button data-needs-conn id="evStop" disabled>Tắt thông báo</button></div>
+      <ul id="evList" class="evl"></ul>
+    </div>
+  </section>
+
+  <section class="panel" id="p-set" hidden>
+    <div class="card" style="--c:var(--sky)">
+      <h2>Hiển thị</h2>
+      <div class="controls">
+        <div><label for="bright">Độ sáng màn hình</label><input type="range" id="bright" min="10" max="255" value="200" aria-label="Độ sáng" disabled data-needs-conn></div>
+        <div><label for="rot">Xoay màn hình</label><select id="rot"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select></div>
+      </div>
+    </div>
+    <div class="card" style="--c:var(--pink)">
+      <h2>Ngôn ngữ</h2>
+      <select id="lang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select>
+      <p class="hint" style="margin:10px 0 0">Ngôn ngữ áp dụng cho trang web và ngày giờ, thời tiết trên màn hình TFT.</p>
+    </div>
+    <div class="card" style="--c:var(--lemon)">
+      <h2>Chế độ đêm</h2>
+      <label class="chk"><input type="checkbox" id="nightEn"> Tự giảm sáng theo khung giờ</label>
+      <div class="controls">
+        <div><label for="nightS">Từ</label><input type="time" id="nightS" value="22:00"></div>
+        <div><label for="nightE">Đến</label><input type="time" id="nightE" value="06:00"></div>
+        <div><label for="nightLv">Độ sáng ban đêm (0 là tắt)</label><input type="range" id="nightLv" min="0" max="120" value="30"></div>
+      </div>
+    </div>
+    <div class="card" style="--c:var(--pink)">
+      <h2>Mã ghép nối</h2>
+      <div class="row"><button data-needs-conn id="btnRekey">Tạo mã ghép nối mới</button></div>
+      <p class="hint" style="margin:10px 0 0">Mã 6 số hiện trên màn hình móc khóa khi có thiết bị lạ kết nối. Trang web nhớ mã sau lần nhập đầu. Đây chỉ là lớp chặn kết nối nhầm, chưa phải mã hóa đường truyền.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="nav" id="tabs">
+  <button class="tab" data-tab="screen"><span>🖥️</span>Màn hình</button>
+  <button class="tab" data-tab="ev"><span>🔔</span>Nhắc nhở</button>
+  <button class="tab" data-tab="set"><span>⚙️</span>Cài đặt</button>
+</nav>
+<div id="codeBox" hidden style="position:fixed;inset:0;z-index:50;background:#2d265088;padding:16px">
+  <div style="background:#fff;border-radius:22px;padding:20px;max-width:340px;width:100%;box-shadow:0 20px 50px #2d265066">
+    <p id="codeMsg" style="margin:0 0 12px;font-weight:700"></p>
+    <input type="text" id="codeInput" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000" style="text-align:center;font-size:1.6rem;letter-spacing:.3em">
+    <div class="row" style="margin-top:14px;justify-content:flex-end"><button id="codeCancel">Hủy</button><button class="primary" id="codeOk">Xác nhận</button></div>
+  </div>
+</div>
+<div id="log">Cần Chrome hoặc Edge (Android, Windows, macOS, Linux). iPhone dùng ứng dụng Bluefy.</div>
+
+<script>
+const SERVICE = '7a1f0001-8c3b-4d5e-9f10-a1b2c3d4e5f6';
+const CHAR    = '7a1f0002-8c3b-4d5e-9f10-a1b2c3d4e5f6';
+const INFO    = '7a1f0003-8c3b-4d5e-9f10-a1b2c3d4e5f6';
+const W = 128, H = 128, MAX_FRAMES = 8, FB = W * H / 8;   // FB = 2048 byte/khung
+const $ = s => document.querySelector(s);
+
+let device = null, chr = null, infoChr = null, queue = Promise.resolve(), weatherTimer = null;
+let currentMode = -1, pend = [], sending = false, lastSent = null, lastPx = null, drawing = false, modeReady = Promise.resolve();
+
+function log(msg, err){ const el = $('#log'); el.textContent = msg; el.className = err ? 'err' : ''; }
+
+function setConn(on){
+  currentMode = -1; pend = []; lastSent = null;
+  $('#status').classList.toggle('on', on);
+  $('#statusText').textContent = on ? T('Đã kết nối') + ' ' + (device?.name || '') : T('Chưa kết nối');
+  $('#btnConnect').textContent = T(on ? 'Ngắt kết nối' : 'Kết nối Bluetooth');
+  document.querySelectorAll('[data-needs-conn]').forEach(b => b.disabled = !on);
+  if (on && !frames.length) $('#btnImage').disabled = true;
+  if (!on){ clearInterval(weatherTimer); weatherTimer = null; }
+}
+
+function write(bytes, noResp){
+  const data = new Uint8Array(bytes);
+  const p = queue.then(async () => {
+    if (!noResp) return chr.writeValueWithResponse(data);
+    // ghi không phản hồi dễ báo "GATT operation failed" khi bộ đệm BLE đầy: chờ rồi thử lại, cuối cùng ghi có phản hồi
+    for (let i = 0; i < 4; i++){
+      try{ return await chr.writeValueWithoutResponse(data); }catch(_){ await sleep(15 * (i + 1)); }
+    }
+    return chr.writeValueWithResponse(data);
+  });
+  queue = p.catch(() => {});
+  return p;
+}
+
+/* ---------- Xác thực mã ghép nối (mã 6 số hiện trên màn hình ESP32) ---------- */
+let keepLog = false;
+const keyStore = () => 'pk:' + (device?.id || 'x');
+const keyBytes = n => [0x58, n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];   // 'X' + u32 little-endian
+async function isAuthed(){
+  if (!infoChr) return true;                  // firmware cũ không có INFO: bỏ qua xác thực
+  await sleep(120);
+  const v = await infoChr.readValue();
+  return v.byteLength < 6 || v.getUint8(5) === 1;
+}
+// Hộp nhập mã trong trang (thay prompt() để chạy tốt trong WebView), trả về chuỗi hoặc null nếu hủy
+function askCode(msg){
+  return new Promise(resolve => {
+    const box = $('#codeBox'), inp = $('#codeInput');
+    $('#codeMsg').textContent = msg; inp.value = ''; box.hidden = false;
+    setTimeout(() => inp.focus(), 50);
+    const done = v => { box.hidden = true; $('#codeOk').onclick = $('#codeCancel').onclick = inp.onkeydown = null; resolve(v); };
+    $('#codeOk').onclick = () => done(inp.value);
+    $('#codeCancel').onclick = () => done(null);
+    inp.onkeydown = e => { if (e.key === 'Enter') done(inp.value); };
+  });
+}
+async function authenticate(){
+  if (await isAuthed()) return true;
+  let saved = null;
+  try{ saved = localStorage.getItem(keyStore()); }catch(_){}
+  if (saved && /^\d{6}$/.test(saved)){
+    await write(keyBytes(+saved));
+    if (await isAuthed()) return true;
+    try{ localStorage.removeItem(keyStore()); }catch(_){}
+  }
+  for (let i = 0; i < 3; i++){
+    const s = await askCode(T('Nhập mã ghép nối 6 số đang hiện trên màn hình móc khóa:'));
+    if (s === null) return false;
+    const c = s.trim();
+    if (!/^\d{6}$/.test(c)){ log(T('Mã gồm đúng 6 chữ số.'), true); continue; }
+    await write(keyBytes(+c));
+    if (await isAuthed()){ try{ localStorage.setItem(keyStore(), c); }catch(_){} return true; }
+    log(T('Sai mã ghép nối.'), true);
+  }
+  return false;
+}
+async function rekey(){
+  if (!isConn() || !confirm(T('Tạo mã mới? Mọi thiết bị đã nhớ mã cũ sẽ phải nhập lại.'))) return;
+  try{
+    await write([0x4A]);                      // 'J'
+    try{ localStorage.removeItem(keyStore()); }catch(_){}
+    keepLog = true;
+    log(T('Đã tạo mã mới. Kết nối lại để xem mã trên màn hình.'));
+    device.gatt.disconnect();
+  }catch(e){ log('Lỗi: ' + e.message, true); }
+}
+
+async function connect(){
+  if (device?.gatt?.connected){ device.gatt.disconnect(); return; }
+  const BT = window.nativeBluetooth || navigator.bluetooth;   // app Android dùng lớp BLE gốc, Chrome dùng Web Bluetooth
+  if (!BT){ log('Trình duyệt này không hỗ trợ Web Bluetooth.', true); return; }
+  try{
+    device = await BT.requestDevice({
+      filters: [{ services: [SERVICE] }, { namePrefix: 'C3-TFT' }, { namePrefix: 'C3-OLED' }],
+      optionalServices: [SERVICE]
+    });
+    device.addEventListener('gattserverdisconnected', () => { setConn(false); if (!keepLog) log('Đã ngắt kết nối.', true); keepLog = false; });
+    log('Đang kết nối…');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SERVICE);
+    chr = await svc.getCharacteristic(CHAR);
+    try{ infoChr = await svc.getCharacteristic(INFO); }catch(_){ infoChr = null; }
+    queue = Promise.resolve();
+    if (!await authenticate()){
+      keepLog = true;
+      log(T('Chưa xác thực được mã ghép nối. Nếu nhập sai nhiều lần, hãy chờ 30 giây rồi thử lại.'), true);
+      device.gatt.disconnect();
+      return;
+    }
+    setConn(true);
+    await sendTime();
+    await sendScreenSettings();
+    if ($('#autoWeather').checked) await updateWeather();
+    startWeatherTimer();
+  }catch(e){
+    if (e.name !== 'NotFoundError') log('Không kết nối được: ' + e.message, true);
+    else log('Bạn chưa chọn thiết bị nào.');
+  }
+}
+
+/* ---------- Chế độ ---------- */
+const MODES = [[0,'Đồng hồ','🕒','#fff0a8','#ffc89b'],[1,'Thời tiết','⛅','#bfe8ff','#a8f0d4'],[6,'Dự báo','📊','#c9d8ff','#d9c4ff'],[7,'Lịch','📅','#ffc4dc','#ffd9b8'],
+  [2,'Hình ảnh','🖼️','#ffc4e4','#cdbdff'],[5,'Bảng vẽ','🎨','#b8f2d0','#fff0a8'],[3,'Bể cá','🐠','#a8f0d4','#a8dcff'],[4,'Tự xoay','🔄','#d9c4ff','#ffc4dc']];
+let selMode = -1;
+const modesEl = $('#modes');
+const markMode = id => modesEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.id === id)));
+MODES.forEach(([id, label, ico, c1, c2]) => {
+  const b = document.createElement('button'), i = document.createElement('span'), t = document.createElement('b');
+  b.className = 'mode'; b.dataset.id = id; b.setAttribute('aria-pressed', 'false');
+  b.style.setProperty('--a', c1); b.style.setProperty('--b', c2);
+  i.className = 'ico'; i.textContent = ico; t.textContent = label; b.append(i, t);
+  b.onclick = () => { selMode = id; markMode(id); showSub(id); if (isConn()) setMode(id); };
+  modesEl.appendChild(b);
+});
+async function setMode(id){
+  currentMode = id;
+  try{
+    if (id === 5) await syncDraw();
+    await write([0x4d, id]);
+  }catch(e){ currentMode = -1; log('Lỗi gửi: ' + e.message, true); }
+}
+// mỗi chế độ chỉ hiện đúng phần tùy chọn của nó
+const SUB = {0: 'clock', 1: 'wx', 6: 'wx', 2: 'img', 5: 'draw'};
+const NOTE = {'-1': 'Chạm một chế độ ở trên để bật và xem tùy chọn.', 3: 'Bể cá chạy tự động, không cần chỉnh gì thêm.', 4: 'Tự luân phiên giữa đồng hồ và thời tiết mỗi vài giây.', 7: 'Lịch dương kèm lịch âm bên dưới. Ngày có chấm vàng là ngày có nhắc nhở.'};
+function showSub(id){
+  const key = SUB[id] || 'note', m = MODES.find(x => x[0] === id);
+  document.querySelectorAll('.sub').forEach(p => p.hidden = p.id !== 'sub-' + key);
+  $('#noteText').textContent = T(NOTE[id] || '');
+  $('#heroMode').textContent = m ? T(m[1]) : T('Chưa chọn chế độ');
+}
+
+/* ---------- Giờ ---------- */
+function sendTime(){
+  const v = new DataView(new ArrayBuffer(7));
+  v.setUint8(0, 0x54);
+  v.setUint32(1, Math.floor(Date.now() / 1000), true);
+  v.setInt16(5, -new Date().getTimezoneOffset(), true);
+  return write(v.buffer).then(() => log('Đã đồng bộ giờ.')).catch(e => log('Lỗi gửi giờ: ' + e.message, true));
+}
+$('#btnTime').onclick = sendTime;
+setInterval(() => { $('#localTime').textContent = 'Máy bạn: ' + new Date().toLocaleString('vi-VN'); }, 1000);
+
+/* ---------- Thời tiết ---------- */
+const ascii = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').replace(/[^\x20-\x7e]/g,'');
+const WMO = c => c===0?'Trời quang':c<=2?'Ít mây':c===3?'Nhiều mây':(c===45||c===48)?'Sương mù':c<=57?'Mưa phùn':(c<=67||(c>=80&&c<=82))?'Mưa':(c<=77||c===85||c===86)?'Tuyết':c>=95?'Dông':'Có mây';
+
+async function updateWeather(){
+  const q = $('#city').value.trim() || 'Ho Chi Minh City';
+  try{
+    log('Đang lấy thời tiết…');
+    const g = await (await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=' + encodeURIComponent(q))).json();
+    if (!g.results?.length) throw new Error('Không tìm thấy "' + q + '"');
+    const p = g.results[0];
+    const w = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,precipitation_probability&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=5&timezone=auto`)).json();
+    const c = w.current;
+    const name = ascii(p.name).replace(/ City$/i,'').slice(0,15);
+    const pkt = new Uint8Array(5 + name.length);
+    const dv = new DataView(pkt.buffer);
+    pkt[0] = 0x57;
+    dv.setInt16(1, Math.round(c.temperature_2m * 10), true);
+    pkt[3] = c.weather_code; pkt[4] = Math.round(c.relative_humidity_2m);
+    for (let i = 0; i < name.length; i++) pkt[5 + i] = name.charCodeAt(i);
+    $('#wx').textContent = `${p.name}: ${c.temperature_2m}°C, ${WMO(c.weather_code)}, ẩm ${c.relative_humidity_2m}%`;
+    await write(pkt);
+    // dự báo: 8 mốc cách nhau 3 giờ + 5 ngày
+    const hs = w.hourly, dd = w.daily, i0 = Math.max(0, hs.time.findIndex(t => t >= c.time.slice(0, 13)));
+    const idx = k => Math.min(i0 + 3 * k, hs.time.length - 1);
+    const temps = Array.from({length: 8}, (_, k) => Math.round(hs.temperature_2m[idx(k)]));
+    const hp = new Uint8Array(18); hp[0] = 0x48; hp[1] = +hs.time[i0].slice(11, 13);
+    temps.forEach((t, k) => { hp[2 + k] = t; hp[10 + k] = Math.round(hs.precipitation_probability[idx(k)] || 0); });
+    const dp = new Uint8Array(17); dp[0] = 0x59; dp[1] = new Date(dd.time[0] + 'T00:00:00').getDay();
+    for (let k = 0; k < 5; k++){ dp[2 + 3*k] = Math.round(dd.temperature_2m_max[k]); dp[3 + 3*k] = Math.round(dd.temperature_2m_min[k]); dp[4 + 3*k] = Math.round(dd.precipitation_probability_max[k] || 0); }
+    await write(hp); await write(dp);
+    const bars = (vals, labels) => { const lo = Math.min(...vals), hi = Math.max(...vals);
+      return '<div class="bars">' + vals.map((v, k) => `<div class="bc"><small>${v}°</small><div class="bar" style="height:${20 + (v - lo) / Math.max(1, hi - lo) * 60}px"></div><small>${labels[k]}</small></div>`).join('') + '</div>'; };
+    $('#wxChart').innerHTML = '<h3>' + T('24 giờ tới') + '</h3>' + bars(temps, temps.map((_, k) => String((hp[1] + 3 * k) % 24).padStart(2, '0') + 'h'));
+    $('#wxChart2').innerHTML = '<h3>' + T('5 ngày tới') + '</h3>' + bars(Array.from(dd.temperature_2m_max, Math.round), Array.from(dd.time, t => new Date(t + 'T00:00:00').toLocaleDateString(lang === 'en' ? 'en-US' : 'vi-VN', {weekday: 'short'})));
+    $('#wx').textContent += ' · ' + T('Cập nhật lúc') + ' ' + new Date().toTimeString().slice(0, 5);
+    log('Đã gửi thời tiết và dự báo.');
+  }catch(e){ log('Lỗi thời tiết: ' + e.message, true); }
+}
+$('#btnWeather').onclick = updateWeather;
+function startWeatherTimer(){
+  clearInterval(weatherTimer);
+  weatherTimer = setInterval(() => { if ($('#autoWeather').checked && device?.gatt?.connected) updateWeather(); }, 15 * 60 * 1000);
+}
+
+/* ---------- Hình ảnh / GIF (màu) ---------- */
+const PAL_BYTES = 512;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let sources = [];   // ImageBitmap
+let frames = [];    // { fmt, data: Uint8Array, preview: ImageData }
+let previewTimer = null, previewIdx = 0;
+const work = document.createElement('canvas'); work.width = W; work.height = H;
+const wctx = work.getContext('2d', { willReadFrequently: true });
+const pctx = $('#preview').getContext('2d');
+
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const to565 = hex => { const [r, g, b] = rgb(hex); return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3); };
+
+function grab(img){
+  wctx.fillStyle = '#000'; wctx.fillRect(0, 0, W, H);
+  const fit = $('#fit').value;
+  let dw = W, dh = H;
+  if (fit !== 'stretch'){
+    const s = fit === 'cover' ? Math.max(W / img.width, H / img.height) : Math.min(W / img.width, H / img.height);
+    dw = img.width * s; dh = img.height * s;
+  }
+  wctx.imageSmoothingQuality = 'high';
+  wctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  return wctx.getImageData(0, 0, W, H).data;
+}
+
+/* ---------- Chuyển ảnh sang màu cho TFT ---------- */
+const exp5 = v => (v << 3) | (v >> 2), exp6 = v => (v << 2) | (v >> 4);
+
+// Floyd–Steinberg: dồn sai số sang các điểm lân cận (buf là Float32Array RGB)
+function spread(buf, x, y, c, e){
+  const i = (y * W + x) * 3 + c;
+  if (x + 1 < W) buf[i + 3] += e * 7 / 16;
+  if (y + 1 < H){
+    if (x > 0) buf[i + W * 3 - 3] += e * 3 / 16;
+    buf[i + W * 3] += e * 5 / 16;
+    if (x + 1 < W) buf[i + W * 3 + 3] += e / 16;
+  }
+}
+const clamp255 = v => v < 0 ? 0 : v > 255 ? 255 : v;
+
+// Định dạng 0: RGB565 thô, little-endian (32768 byte)
+function convRGB565(d, dither){
+  const N = W * H, out = new Uint8Array(N * 2), prev = new ImageData(W, H);
+  const buf = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++){ buf[i*3] = d[i*4]; buf[i*3+1] = d[i*4+1]; buf[i*3+2] = d[i*4+2]; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y * W + x;
+    const r = clamp255(buf[i*3]), g = clamp255(buf[i*3+1]), b = clamp255(buf[i*3+2]);
+    const r5 = Math.round(r * 31 / 255), g6 = Math.round(g * 63 / 255), b5 = Math.round(b * 31 / 255);
+    const rr = exp5(r5), gg = exp6(g6), bb = exp5(b5);
+    if (dither){ spread(buf, x, y, 0, r - rr); spread(buf, x, y, 1, g - gg); spread(buf, x, y, 2, b - bb); }
+    const p = (r5 << 11) | (g6 << 5) | b5;
+    out[i*2] = p & 255; out[i*2+1] = p >> 8;
+    prev.data[i*4] = rr; prev.data[i*4+1] = gg; prev.data[i*4+2] = bb; prev.data[i*4+3] = 255;
+  }
+  return { fmt: 0, data: out, preview: prev };
+}
+
+// Định dạng 1: bảng 256 màu thích nghi (median cut) = 512 byte bảng màu + 16384 byte chỉ số
+function convPalette(d, dither){
+  const N = W * H, counts = new Uint32Array(32768);
+  for (let i = 0; i < N; i++) counts[((d[i*4] >> 3) << 10) | ((d[i*4+1] >> 3) << 5) | (d[i*4+2] >> 3)]++;
+  const keys = [];
+  for (let k = 0; k < 32768; k++) if (counts[k]) keys.push(k);
+
+  const mk = arr => {
+    let rmin = 31, rmax = 0, gmin = 31, gmax = 0, bmin = 31, bmax = 0, pop = 0;
+    for (const k of arr){
+      const r = k >> 10, g = (k >> 5) & 31, b = k & 31;
+      if (r < rmin) rmin = r; if (r > rmax) rmax = r;
+      if (g < gmin) gmin = g; if (g > gmax) gmax = g;
+      if (b < bmin) bmin = b; if (b > bmax) bmax = b;
+      pop += counts[k];
+    }
+    const rr = rmax - rmin, gg = gmax - gmin, bb = bmax - bmin;
+    return { arr, pop, rr, gg, bb, range: Math.max(rr, gg, bb) };
+  };
+  const boxes = [mk(keys)];
+  while (boxes.length < 256){
+    let bi = -1, best = -1;
+    for (let i = 0; i < boxes.length; i++){
+      const b = boxes[i];
+      if (b.arr.length < 2) continue;
+      const sc = b.pop * (b.range + 1);
+      if (sc > best){ best = sc; bi = i; }
+    }
+    if (bi < 0) break;
+    const b = boxes[bi];
+    const ch = (b.gg >= b.rr && b.gg >= b.bb) ? 1 : (b.rr >= b.bb ? 0 : 2);
+    const get = k => ch === 0 ? k >> 10 : ch === 1 ? (k >> 5) & 31 : k & 31;
+    b.arr.sort((a, c) => get(a) - get(c));
+    let acc = 0, cut = b.arr.length - 1;
+    for (let j = 0; j < b.arr.length - 1; j++){
+      acc += counts[b.arr[j]];
+      if (acc >= b.pop / 2){ cut = j + 1; break; }
+    }
+    boxes.splice(bi, 1, mk(b.arr.slice(0, cut)), mk(b.arr.slice(cut)));
+  }
+
+  const pn = boxes.length;
+  const pal = new Uint8Array(PAL_BYTES), pr = new Uint8Array(256), pg = new Uint8Array(256), pb = new Uint8Array(256);
+  boxes.forEach((b, i) => {
+    let sr = 0, sg = 0, sb = 0, p = 0;
+    for (const k of b.arr){ const w = counts[k]; sr += (k >> 10) * w; sg += ((k >> 5) & 31) * w; sb += (k & 31) * w; p += w; }
+    const r5 = Math.round(sr / p), g6 = Math.round(sg / p * 63 / 31), b5 = Math.round(sb / p);
+    const v = (r5 << 11) | (g6 << 5) | b5;
+    pal[i*2] = v & 255; pal[i*2+1] = v >> 8;
+    pr[i] = exp5(r5); pg[i] = exp6(g6); pb[i] = exp5(b5);
+  });
+
+  const cache = new Int16Array(32768).fill(-1);
+  const nearest = (r, g, b) => {
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    let c = cache[key];
+    if (c >= 0) return c;
+    const cr = (r & 0xF8) + 4, cg = (g & 0xF8) + 4, cb = (b & 0xF8) + 4;
+    let bd = 1e9; c = 0;
+    for (let i = 0; i < pn; i++){
+      const dr = cr - pr[i], dg = cg - pg[i], db = cb - pb[i];
+      const dd = dr * dr * 2 + dg * dg * 4 + db * db * 3;
+      if (dd < bd){ bd = dd; c = i; }
+    }
+    return cache[key] = c;
+  };
+
+  const out = new Uint8Array(PAL_BYTES + N), prev = new ImageData(W, H);
+  out.set(pal, 0);
+  const buf = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++){ buf[i*3] = d[i*4]; buf[i*3+1] = d[i*4+1]; buf[i*3+2] = d[i*4+2]; }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = y * W + x;
+    const r = clamp255(buf[i*3]), g = clamp255(buf[i*3+1]), b = clamp255(buf[i*3+2]);
+    const c = nearest(r | 0, g | 0, b | 0);
+    if (dither){ spread(buf, x, y, 0, r - pr[c]); spread(buf, x, y, 1, g - pg[c]); spread(buf, x, y, 2, b - pb[c]); }
+    out[PAL_BYTES + i] = c;
+    prev.data[i*4] = pr[c]; prev.data[i*4+1] = pg[c]; prev.data[i*4+2] = pb[c]; prev.data[i*4+3] = 255;
+  }
+  return { fmt: 1, data: out, preview: prev };
+}
+
+function startPreview(){
+  clearInterval(previewTimer);
+  if (!frames.length) return;
+  pctx.putImageData(frames[previewIdx % frames.length].preview, 0, 0);
+  if (frames.length > 1) previewTimer = setInterval(() => {
+    previewIdx = (previewIdx + 1) % frames.length;
+    pctx.putImageData(frames[previewIdx].preview, 0, 0);
+  }, 1000 / +$('#fps').value);
+}
+
+function rebuild(){
+  clearInterval(previewTimer);
+  const dither = $('#dither').checked, multi = sources.length > 1;
+  frames = sources.map(img => { const d = grab(img); return multi ? convPalette(d, dither) : convRGB565(d, dither); });
+  if (!frames.length){
+    pctx.clearRect(0, 0, W, H);
+    $('#frameInfo').textContent = 'Chưa chọn ảnh'; $('#btnImage').disabled = true; return;
+  }
+  previewIdx = 0; startPreview();
+  const kb = Math.round(frames.reduce((s, f) => s + f.data.length, 0) / 1024);
+  $('#frameInfo').textContent = frames.length + ' khung · ' + (multi ? 'bảng 256 màu' : 'màu đầy đủ 65.536 màu') + ' · ' + kb + ' KB';
+  $('#btnImage').disabled = !device?.gatt?.connected;
+}
+
+async function loadFile(file){
+  if (file.type === 'image/gif' && 'ImageDecoder' in window){
+    try{
+      const dec = new ImageDecoder({ data: await file.arrayBuffer(), type: 'image/gif' });
+      await dec.tracks.ready;
+      const n = dec.tracks.selectedTrack.frameCount, step = Math.max(1, Math.ceil(n / MAX_FRAMES)), out = [];
+      for (let i = 0; i < n && out.length < MAX_FRAMES; i += step){
+        const { image } = await dec.decode({ frameIndex: i });
+        out.push(await createImageBitmap(image)); image.close();
+      }
+      return out;
+    }catch(e){ /* rơi về ảnh tĩnh */ }
+  }
+  return [await createImageBitmap(file)];
+}
+
+$('#file').onchange = async e => {
+  sources = [];
+  for (const f of [...e.target.files].slice(0, MAX_FRAMES)){
+    try{ sources.push(...await loadFile(f)); }catch(err){ log('Không đọc được ' + f.name, true); }
+  }
+  sources = sources.slice(0, MAX_FRAMES);
+  rebuild();
+};
+['fit', 'dither'].forEach(id => $('#' + id).addEventListener('input', () => { if (sources.length) rebuild(); }));
+$('#fps').addEventListener('input', () => { $('#fpsV').textContent = $('#fps').value; startPreview(); });
+
+// Đọc characteristic INFO: MTU, số khung ESP32 cấp phát được
+async function readInfo(){
+  for (let i = 0; i < 25; i++){
+    const v = await infoChr.readValue();
+    if (v.byteLength >= 5 && v.getUint8(4) === 1)
+      return { mtu: v.getUint16(0, true), granted: v.getUint8(2), max: v.getUint8(3) };
+    await sleep(150);
+  }
+  throw new Error('ESP32 không phản hồi khi cấp phát bộ nhớ');
+}
+
+$('#btnImage').onclick = async () => {
+  if (!frames.length) return;
+  if (!infoChr){ log('Không thấy characteristic INFO, hãy nạp lại firmware mới nhất cho ESP32.', true); return; }
+  const bar = $('#prog'), btn = $('#btnImage');
+  btn.disabled = true;
+  try{
+    const fmt = frames[0].fmt, fpsV = +$('#fps').value;
+    log('ESP32 đang cấp phát bộ nhớ…');
+    await write([0x53, frames.length, fpsV, fmt]);                  // 'S': chuẩn bị nhận
+    const info = await readInfo();
+    if (!info.granted) throw new Error('ESP32 không còn đủ RAM để nhận ảnh');
+    let send = frames;
+    if (info.granted < frames.length){                               // chọn các khung cách đều nhau
+      send = Array.from({ length: info.granted }, (_, k) => frames[Math.floor(k * frames.length / info.granted)]);
+      log('RAM ESP32 chỉ đủ ' + info.granted + '/' + frames.length + ' khung, đang gửi các khung cách đều nhau…');
+    }
+    const chunk = Math.max(16, Math.min(240, info.mtu - 7));         // 4 byte tiêu đề + 3 byte ATT
+    const total = send.reduce((s, f) => s + f.data.length, 0);
+    bar.hidden = false; bar.max = total; bar.value = 0;
+    let done = 0, pk = 0;
+    for (let f = 0; f < send.length; f++){
+      const data = send[f].data;
+      for (let off = 0; off < data.length; off += chunk){
+        const part = data.subarray(off, off + chunk);
+        const pkt = new Uint8Array(4 + part.length);
+        pkt[0] = 0x50; pkt[1] = f; pkt[2] = off & 255; pkt[3] = off >> 8; pkt.set(part, 4);   // 'P'
+        // gửi không chờ phản hồi cho nhanh, cứ 8 gói thì chờ ESP32 xác nhận một lần để không tràn bộ đệm
+        await write(pkt, ++pk % 8 !== 0);
+        done += part.length; bar.value = done;
+      }
+    }
+    await write([0x46, send.length, fpsV]);                          // 'F': chốt
+    await setMode(2);
+    log('Đã gửi ' + send.length + ' khung hình (gói ' + chunk + ' byte).');
+  }catch(e){ log('Lỗi gửi ảnh: ' + e.message, true); }
+  bar.hidden = true; btn.disabled = !device?.gatt?.connected;
+};
+
+// Bảng vẽ đơn sắc: tô theo màu nét/nền đã chọn
+function drawFrame(buf, ctx = pctx){
+  const fg = rgb($('#colFg').value), bg = rgb($('#colBg').value);
+  const im = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const c = (buf[y * 16 + (x >> 3)] >> (x & 7) & 1) ? fg : bg, o = (y * W + x) * 4;
+    im.data[o] = c[0]; im.data[o+1] = c[1]; im.data[o+2] = c[2]; im.data[o+3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+}
+
+/* ---------- Bảng vẽ ---------- */
+const padBuf = new Uint8Array(FB);
+const pad = $('#pad'), padCtx = pad.getContext('2d');
+let tool = 'pen', brush = 1, padDirty = true;
+
+function plot(buf, x, y, on, size){
+  const r = size - 1;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++){
+    const px = x + dx, py = y + dy;
+    if (px < 0 || px >= W || py < 0 || py >= H) continue;
+    const i = py * 16 + (px >> 3), m = 1 << (px & 7);
+    if (on) buf[i] |= m; else buf[i] &= ~m;
+  }
+}
+function line(buf, x0, y0, x1, y1, on, size){
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;){
+    plot(buf, x0, y0, on, size);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy){ err += dy; x0 += sx; }
+    if (e2 <= dx){ err += dx; y0 += sy; }
+  }
+}
+function padPos(e){
+  const r = pad.getBoundingClientRect();
+  return [Math.min(W-1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * W))),
+          Math.min(H-1, Math.max(0, Math.floor((e.clientY - r.top) / r.height * H)))];
+}
+const connected = () => !!(device?.gatt?.connected && chr);
+
+function syncDraw(){
+  const ps = [];
+  for (let off = 0; off < FB; off += 16){
+    const pkt = new Uint8Array(20);
+    pkt[0] = 0x49; pkt[1] = 0xff; pkt[2] = off & 255; pkt[3] = off >> 8;
+    pkt.set(padBuf.subarray(off, off + 16), 4);
+    ps.push(write(pkt, true));
+  }
+  return Promise.all(ps);
+}
+
+async function flush(){
+  if (sending) return;
+  sending = true;
+  try{
+    await modeReady;
+    while (pend.length && connected()){
+      const take = [];
+      if (!pend[0][2] && lastSent) take.push(lastSent);
+      take.push(pend.shift());
+      while (pend.length && !pend[0][2] && take.length < 9) take.push(pend.shift());
+      lastSent = take[take.length - 1];
+      const pkt = [0x44, take[0][3]];
+      take.forEach(p => pkt.push(p[0], p[1]));
+      await write(pkt, true);
+    }
+  }catch(e){ pend = []; log('Lỗi bảng vẽ: ' + e.message, true); }
+  sending = false;
+}
+
+function addPoint(x, y, isNew){
+  if (!isNew && lastPx && lastPx[0] === x && lastPx[1] === y) return;
+  const on = tool !== 'eraser';
+  if (isNew || !lastPx) plot(padBuf, x, y, on, brush); else line(padBuf, lastPx[0], lastPx[1], x, y, on, brush);
+  lastPx = [x, y]; padDirty = true;
+  if (connected()){ pend.push([x, y, isNew, (on ? 0 : 1) | (brush << 1)]); flush(); }
+}
+
+pad.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  pad.setPointerCapture(e.pointerId);
+  drawing = true;
+  if (connected() && currentMode !== 5) modeReady = setMode(5);
+  const [x, y] = padPos(e);
+  addPoint(x, y, true);
+});
+pad.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  for (const ev of (evs.length ? evs : [e])){ const [x, y] = padPos(ev); addPoint(x, y, false); }
+});
+['pointerup', 'pointercancel'].forEach(t => pad.addEventListener(t, () => { drawing = false; lastPx = null; }));
+
+function setTool(t){
+  tool = t;
+  $('#toolPen').setAttribute('aria-pressed', String(t === 'pen'));
+  $('#toolEraser').setAttribute('aria-pressed', String(t === 'eraser'));
+}
+$('#toolPen').onclick = () => setTool('pen');
+$('#toolEraser').onclick = () => setTool('eraser');
+$('#padSize').oninput = e => { brush = +e.target.value; $('#padSizeV').textContent = brush; };
+$('#padClear').onclick = () => {
+  padBuf.fill(0); padDirty = true; pend = []; lastSent = null;
+  if (connected()) write([0x43]).catch(err => log('Lỗi: ' + err.message, true));
+};
+$('#padFromImage').onclick = () => {
+  if (!frames.length){ log('Hãy chọn ảnh ở phần "Hình ảnh và GIF" trước.', true); return; }
+  const p = frames[0].preview.data;
+  padBuf.fill(0);
+  for (let i = 0; i < W * H; i++){
+    const lum = 0.299 * p[i*4] + 0.587 * p[i*4+1] + 0.114 * p[i*4+2];
+    if (lum >= 128) padBuf[((i / W) | 0) * 16 + ((i % W) >> 3)] |= 1 << (i % W & 7);
+  }
+  padDirty = true;
+  if (connected() && currentMode === 5) syncDraw().catch(err => log('Lỗi: ' + err.message, true));
+};
+(function tick(){ if (padDirty){ drawFrame(padBuf, padCtx); padDirty = false; } requestAnimationFrame(tick); })();
+
+
+// Bảng màu: đổi màu cọ của cả bản vẽ
+const palEl = $('#palette');
+['#ff9eb5','#ff7eb6','#ffb38a','#ffd966','#fff3a0','#c3f584','#7fe0a8','#5fd8d0','#8fd3ff','#7fb0ff','#b79cff','#d9a6ff','#ffffff','#c9c4d8','#8d82a8','#3a3350'].forEach(hex => {
+  const b = document.createElement('button');
+  b.className = 'sw'; b.style.background = hex; b.dataset.c = hex; b.setAttribute('aria-label', 'Màu ' + hex);
+  b.onclick = () => { $('#colFg').value = hex; padDirty = true; markSw(); sendColors(); };
+  palEl.appendChild(b);
+});
+const markSw = () => palEl.querySelectorAll('.sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === $('#colFg').value)));
+
+/* ---------- Tab ---------- */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === id)));
+  document.querySelectorAll('.panel').forEach(p => p.hidden = p.id !== 'p-' + id);
+}
+showTab('screen');
+
+/* ---------- Cài đặt ---------- */
+const isConn = () => !!(device?.gatt?.connected && chr);
+const sendColors = () => {
+  if (!isConn()) return Promise.resolve();
+  const v = new DataView(new ArrayBuffer(5));
+  v.setUint8(0, 0x4b); v.setUint16(1, to565($('#colFg').value), true); v.setUint16(3, to565($('#colBg').value), true);
+  return write(v.buffer).catch(err => log('Lỗi gửi màu: ' + err.message, true));
+};
+const sendRotation = () => isConn() ? write([0x52, +$('#rot').value]).catch(err => log('Lỗi xoay: ' + err.message, true)) : Promise.resolve();
+const sendBright = () => isConn() ? write([0x42, +$('#bright').value]).catch(err => log('Lỗi: ' + err.message, true)) : Promise.resolve();
+const sendLang = () => isConn() ? write([0x47, lang === 'vi' ? 1 : 0]).catch(err => log('Lỗi: ' + err.message, true)) : Promise.resolve();
+async function sendScreenSettings(){ await sendRotation(); await sendColors(); await sendBright(); await sendLang(); await sendStyle(); await sendNight(); await syncEvents(); }
+
+['colFg', 'colBg'].forEach(id => $('#' + id).addEventListener('input', () => { padDirty = true; markSw(); }));
+['colFg', 'colBg'].forEach(id => $('#' + id).addEventListener('change', sendColors));
+$('#rot').addEventListener('change', sendRotation);
+$('#bright').addEventListener('change', sendBright);
+markSw();
+
+/* ---------- Kiểu đồng hồ, chế độ đêm, sự kiện ---------- */
+const sendStyle = () => isConn() ? write([0x5a, +$('#clockStyle').value]).catch(err => log('Lỗi: ' + err.message, true)) : Promise.resolve();
+const hm = s => { const [a, b] = (s || '0:0').split(':'); return +a * 60 + +b; };
+const sendNight = () => {
+  if (!isConn()) return Promise.resolve();
+  const v = new DataView(new ArrayBuffer(7));
+  v.setUint8(0, 0x4e); v.setUint8(1, $('#nightEn').checked ? 1 : 0);
+  v.setUint16(2, hm($('#nightS').value), true); v.setUint16(4, hm($('#nightE').value), true); v.setUint8(6, +$('#nightLv').value);
+  return write(v.buffer).catch(err => log('Lỗi: ' + err.message, true));
+};
+$('#clockStyle').addEventListener('change', sendStyle);
+['nightEn', 'nightS', 'nightE', 'nightLv'].forEach(id => $('#' + id).addEventListener('change', sendNight));
+
+let events = [];
+try{ events = JSON.parse(localStorage.getItem('events') || '[]'); }catch(_){}
+const nowLocal = () => Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+function renderEv(){
+  events.sort((a, b) => a.at - b.at);
+  try{ localStorage.setItem('events', JSON.stringify(events)); }catch(_){}
+  const ul = $('#evList'); ul.textContent = '';
+  events.forEach((e, i) => {
+    const li = document.createElement('li'), s = document.createElement('span');
+    s.textContent = new Date(e.at * 1000).toISOString().slice(0, 19).replace('T', ' ') + '  ' + e.note + (e.at < nowLocal() ? '  ✓' : '');
+    const b = document.createElement('button'); b.textContent = '✕'; b.setAttribute('aria-label', 'Xóa');
+    b.onclick = () => { events.splice(i, 1); renderEv(); syncEvents(); };
+    li.append(s, b); ul.append(li);
+  });
+}
+async function syncEvents(){
+  if (!isConn()) return;
+  try{
+    const fut = events.filter(e => e.at >= nowLocal()).slice(0, 8);
+    await write([0x65]);
+    for (let i = 0; i < fut.length; i++){
+      const n = fut[i].note, p = new Uint8Array(6 + n.length);
+      p[0] = 0x45; p[1] = i; new DataView(p.buffer).setUint32(2, fut[i].at, true);
+      for (let k = 0; k < n.length; k++) p[6 + k] = n.charCodeAt(k);
+      await write(p);
+    }
+  }catch(err){ log('Lỗi gửi sự kiện: ' + err.message, true); }
+}
+$('#evDate').value = new Date().toLocaleDateString('sv');
+$('#evAdd').onclick = () => {
+  const dt = $('#evDate').value, tm = $('#evTime').value;
+  if (!dt || !tm){ log('Hãy chọn ngày và giờ.', true); return; }
+  if (events.filter(e => e.at >= nowLocal()).length >= 8){ log('Tối đa 8 sự kiện chưa diễn ra.', true); return; }
+  const [y, m, d] = dt.split('-').map(Number), [hh, mi, ss] = tm.split(':').map(Number);
+  events.push({at: Date.UTC(y, m - 1, d, hh, mi, ss || 0) / 1000, note: ascii($('#evNote').value.trim()).slice(0, 22) || 'Event'});
+  $('#evNote').value = ''; renderEv(); syncEvents();
+};
+$('#evStop').onclick = () => isConn() && write([0x41]).catch(() => {});
+renderEv();
+
+/* ---------- Nhớ cài đặt trên trình duyệt (khớp với flash của thiết bị) ---------- */
+const KEEP = ['rot', 'bright', 'colFg', 'colBg', 'clockStyle', 'nightEn', 'nightS', 'nightE', 'nightLv', 'city', 'autoWeather'];
+try{
+  const sv = JSON.parse(localStorage.getItem('ui') || '{}');
+  KEEP.forEach(id => { if (id in sv){ const el = $('#' + id); if (el.type === 'checkbox') el.checked = sv[id]; else el.value = sv[id]; } });
+}catch(_){}
+KEEP.forEach(id => $('#' + id).addEventListener('change', () => {
+  try{ localStorage.setItem('ui', JSON.stringify(Object.fromEntries(KEEP.map(k => [k, $('#' + k).type === 'checkbox' ? $('#' + k).checked : $('#' + k).value])))); }catch(_){}
+}));
+padDirty = true; markSw();
+
+/* ---------- Ngôn ngữ ---------- */
+const EN = {"Chung": "Home", "Giờ": "Time", "Thời tiết": "Weather", "Ảnh": "Image", "Vẽ": "Draw", "Cài đặt": "Settings", "Kết nối Bluetooth": "Connect Bluetooth", "Ngắt kết nối": "Disconnect", "Chưa kết nối": "Not connected", "Đã kết nối": "Connected", "Chế độ hiển thị": "Display mode", "Chọn nội dung hiện trên màn hình.": "Choose what the screen shows.", "Đồng hồ": "Clock", "Hình ảnh": "Images", "Bể cá": "Aquarium", "Tự xoay giờ/thời tiết": "Auto clock/weather", "Bảng vẽ": "Drawing", "Đồng bộ giờ ngay": "Sync time now", "Thành phố": "City", "Cập nhật và gửi": "Update and send", "Tự cập nhật mỗi 15 phút khi đang kết nối": "Auto-update every 15 min while connected", "Hình ảnh và GIF": "Images and GIF", "Cách vừa khung": "Fit", "Giữ tỉ lệ (có viền đen)": "Keep ratio (black bars)", "Phủ kín (cắt bớt)": "Fill (crop)", "Kéo giãn": "Stretch", "Tốc độ:": "Speed:", "khung/giây": "fps", "Dither (mượt vùng chuyển sắc)": "Dither (smooth gradients)", "Gửi lên màn hình": "Send to screen", "Chưa chọn ảnh": "No image chosen", "Bảng vẽ đơn sắc": "Monochrome drawing", "Cả bản vẽ dùng một màu cọ trên một màu nền. Đổi màu sẽ đổi toàn bộ nét vẽ.": "The whole drawing uses one brush colour on one background. Changing it recolours every stroke.", "✏️ Bút": "✏️ Pen", "🧽 Tẩy": "🧽 Eraser", "Bảng màu cọ": "Brush palette", "Màu cọ": "Brush colour", "Màu nền": "Background", "Cỡ nét:": "Brush size:", "Xóa hết": "Clear all", "Lấy ảnh tab Ảnh làm nền (đen trắng)": "Use Image tab picture as background (B/W)", "Gửi lại bản vẽ": "Resend drawing", "Độ sáng màn hình": "Screen brightness", "Xoay màn hình": "Rotate screen", "Ngôn ngữ": "Language", "Ngôn ngữ áp dụng cho trang web và ngày giờ, thời tiết trên màn hình TFT.": "Applies to this page and to the date and weather text on the TFT.", "Tự đồng bộ khi kết nối. Giờ chạy trên ESP32 nên không cần giữ kết nối liên tục.": "Synced automatically on connect. The clock runs on the ESP32, so no constant connection is needed.", "Lấy từ Open-Meteo (không cần API key) rồi gửi sang ESP32.": "Fetched from Open-Meteo (no API key) and sent to the ESP32.", "Một ảnh tĩnh dùng 65.536 màu. Nhiều ảnh hoặc GIF dùng bảng 256 màu để chứa được nhiều khung hơn (tối đa tùy RAM còn trống của ESP32).": "A single image uses 65,536 colours. Several images or a GIF use a 256-colour palette to fit more frames (limited by free ESP32 RAM)."};
+Object.assign(EN, {'Sự kiện':'Events','Kiểu đồng hồ':'Clock style','Số lớn':'Big digits','Kim':'Analog','Xếp dọc':'Stacked','Tối giản':'Minimal','Dự báo':'Forecast','Lịch âm dương':'Solar + lunar calendar','Chế độ đêm':'Night mode','Tự giảm sáng theo khung giờ':'Dim automatically in a time window','Từ':'From','Đến':'To','Độ sáng ban đêm (0 là tắt)':'Night brightness (0 = off)','Sự kiện nhắc nhở':'Event reminders','Đến đúng giờ, màn hình hiện thông báo toàn màn hình trong 60 giây. Ghi chú viết không dấu, tối đa 22 ký tự.':'At the set time the screen shows a full-screen alert for 60 seconds. Notes are plain ASCII, up to 22 characters.','Ngày':'Date','Giờ : phút : giây':'Hour : minute : second','Ghi chú':'Note','Thêm sự kiện':'Add event','Tắt thông báo':'Dismiss alert','Cập nhật lúc':'Updated at'});
+Object.assign(EN, {'Xin chào 👋':'Hello 👋','Chạm một chế độ bên dưới để hiện lên móc khóa.':'Tap a mode below to show it on your keychain.','Chưa chọn chế độ':'No mode selected','chạm để bật và chỉnh':'tap to switch and adjust','Lịch':'Calendar','Tự xoay':'Auto','Màn hình':'Screen','Nhắc nhở':'Reminders','Thời tiết và dự báo':'Weather and forecast','24 giờ tới':'Next 24 hours','5 ngày tới':'Next 5 days','📁 Chọn ảnh hoặc GIF':'📁 Choose image or GIF','Hiển thị':'Display','Móc khóa màn hình mini':'Mini screen keychain','Đồng hồ':'Clock','Chạm một chế độ ở trên để bật và xem tùy chọn.':'Tap a mode above to switch to it and see its options.','Bể cá chạy tự động, không cần chỉnh gì thêm.':'The aquarium runs by itself, nothing to adjust.','Tự luân phiên giữa đồng hồ và thời tiết mỗi vài giây.':'Alternates between clock and weather every few seconds.','Lịch dương kèm lịch âm bên dưới. Ngày có chấm vàng là ngày có nhắc nhở.':'Solar calendar with the lunar date underneath. A yellow dot marks a reminder.'});
+let lang = 'vi';
+try{ lang = localStorage.getItem('lang') === 'en' ? 'en' : 'vi'; }catch(_){}
+const T = s => (lang === 'en' && EN[s]) || s;
+function applyLang(){
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; n = w.nextNode();){
+    const t = n.nodeValue.trim();
+    if (!t) continue;
+    if (n._vi === undefined){ if (!(t in EN)) continue; n._vi = t; }
+    n.nodeValue = (lang === 'en' ? EN[n._vi] : n._vi) + (n._vi.endsWith(':') ? ' ' : '');
+  }
+  document.documentElement.lang = lang;
+  $('#lang').value = lang;
+  $('#lang')._draw?.();
+  showSub(selMode);
+}
+$('#lang').addEventListener('change', e => {
+  lang = e.target.value; try{ localStorage.setItem('lang', lang); }catch(_){}
+  applyLang(); sendLang();
+});
+
+/* ---------- Giao diện: chip chọn nhanh, đồng hồ trên thẻ ---------- */
+function chipify(id){
+  const s = $('#' + id), box = document.createElement('div');
+  box.className = 'chips'; s.after(box); s.hidden = true;
+  const draw = () => box.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === s.value)));
+  [...s.options].forEach(o => {
+    const b = document.createElement('button');
+    b.textContent = o.textContent; b.dataset.v = o.value;
+    b.onclick = () => { s.value = o.value; s.dispatchEvent(new Event('change')); draw(); };
+    box.append(b);
+  });
+  s._draw = draw; s.addEventListener('change', draw); draw();
+}
+['clockStyle', 'rot', 'lang'].forEach(chipify);
+function tickHero(){
+  const d = new Date();
+  $('#heroTime').textContent = d.toTimeString().slice(0, 5);
+  $('#heroSec').style.width = (d.getSeconds() / 59 * 100) + '%';
+  $('#heroDate').textContent = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', {weekday: 'short', day: 'numeric', month: 'short'});
+}
+setInterval(tickHero, 1000); tickHero();
+showSub(-1);
+
+$('#btnConnect').onclick = connect;
+$('#btnRekey').onclick = rekey;
+Object.assign(EN, {'Hủy':'Cancel','Xác nhận':'Confirm'});
+Object.assign(EN, {'Mã ghép nối':'Pairing code','Tạo mã ghép nối mới':'Generate new pairing code','Mã 6 số hiện trên màn hình móc khóa khi có thiết bị lạ kết nối. Trang web nhớ mã sau lần nhập đầu. Đây chỉ là lớp chặn kết nối nhầm, chưa phải mã hóa đường truyền.':'A 6-digit code appears on the keychain screen when an unknown device connects. This page remembers it after the first entry. It only blocks accidental connections; it does not encrypt the link.','Nhập mã ghép nối 6 số đang hiện trên màn hình móc khóa:':'Enter the 6-digit pairing code shown on the keychain screen:','Mã gồm đúng 6 chữ số.':'The code must be exactly 6 digits.','Sai mã ghép nối.':'Wrong pairing code.','Chưa xác thực được mã ghép nối. Nếu nhập sai nhiều lần, hãy chờ 30 giây rồi thử lại.':'Pairing failed. After several wrong tries, wait 30 seconds and retry.','Tạo mã mới? Mọi thiết bị đã nhớ mã cũ sẽ phải nhập lại.':'Generate a new code? Every device that remembered the old code must enter it again.','Đã tạo mã mới. Kết nối lại để xem mã trên màn hình.':'New code created. Reconnect to see it on the screen.'});
+setConn(false);
+applyLang();
+</script>
+</body>
+</html>
